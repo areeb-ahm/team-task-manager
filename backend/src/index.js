@@ -17,10 +17,18 @@ const app = express();
 
 // ─── Middleware ──────────────────────────────────────────────────────────────
 
+// Parse comma-separated URLs from .env
+const allowedOrigins = process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',') : ['http://localhost:5173'];
+
 app.use(cors({
-  origin: process.env.CLIENT_URL,
-  credentials: true
+  origin: allowedOrigins,
+  credentials: true // CRITICAL: allows sending cookies cross-origin
 }));
+
+// CRITICAL FOR CLOUD RUN / PRODUCTION: Trust the first proxy.
+// Cloud Run load balancers terminate SSL. Express needs this to know the original request was HTTPS, 
+// otherwise it will refuse to set secure: true cookies.
+app.set('trust proxy', 1);
 
 app.use(express.json());
 
@@ -34,8 +42,10 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
+    // CRITICAL: secure must be true for cross-origin cookies
     secure: process.env.NODE_ENV === 'production',
     maxAge: 86400000, // 24 hours
+    // CRITICAL: sameSite 'none' allows cookies to be sent cross-domain
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
   }
 }));
